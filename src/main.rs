@@ -101,6 +101,8 @@ async fn run_app(
                     app.response = Some(response);
                     app.response_scroll = 0;
                     app.response_scroll_x = 0;
+                    app.response_sel_start = None;
+                    app.response_sel_end = None;
                     // don't auto-jump to response panel — user stays where they are
                 }
                 Err(err) => {

@@ -360,6 +360,19 @@ fn handle_nav_response(app: &mut App, key: KeyEvent) -> AppAction {
             app.response_scroll = 0;
             app.response_scroll_x = 0;
         }
+
+        // Copy selection to clipboard
+        (KeyCode::Char('y'), KeyModifiers::NONE) | (KeyCode::Char('c'), KeyModifiers::CONTROL) => {
+            let msg = app.copy_response_selection();
+            app.status_message = msg;
+        }
+
+        // Clear selection
+        (KeyCode::Esc, _) => {
+            app.response_sel_start = None;
+            app.response_sel_end = None;
+        }
+
         _ => {}
     }
     AppAction::None
@@ -1042,8 +1055,38 @@ pub fn handle_mouse(app: &mut App, mouse: MouseEvent) -> AppAction {
             } else if rect_contains(app.request_rect, x, y) {
                 app.focus = FocusPanel::RequestEditor;
                 if app.editing { app.editing = false; }
+            } else if rect_contains(app.response_body_rect, x, y) {
+                // Start a text selection in the response body
+                app.focus = FocusPanel::ResponseViewer;
+                let pos = mouse_to_content_pos(app, x, y);
+                app.response_sel_start = pos;
+                app.response_sel_end = pos;
+                app.response_is_selecting = true;
             } else if rect_contains(app.response_rect, x, y) {
                 app.focus = FocusPanel::ResponseViewer;
+                // Click outside the body area (e.g. tabs, status) clears selection
+                app.response_sel_start = None;
+                app.response_sel_end = None;
+                app.response_is_selecting = false;
+            }
+        }
+
+        // ── Mouse drag — update selection end ─────────────────────────────
+        MouseEventKind::Drag(MouseButton::Left) => {
+            if app.response_is_selecting && rect_contains(app.response_body_rect, x, y) {
+                app.response_sel_end = mouse_to_content_pos(app, x, y);
+            }
+        }
+
+        // ── Mouse button release — finalise selection ──────────────────────
+        MouseEventKind::Up(MouseButton::Left) => {
+            if app.response_is_selecting {
+                app.response_is_selecting = false;
+                // If start == end the user just clicked without dragging; clear selection
+                if app.response_sel_start == app.response_sel_end {
+                    app.response_sel_start = None;
+                    app.response_sel_end = None;
+                }
             }
         }
 
@@ -1051,6 +1094,16 @@ pub fn handle_mouse(app: &mut App, mouse: MouseEvent) -> AppAction {
     }
 
     AppAction::None
+}
+
+/// Convert a terminal position to content (line, col) coordinates within the
+/// response body, accounting for scroll offsets.
+fn mouse_to_content_pos(app: &App, x: u16, y: u16) -> Option<(usize, usize)> {
+    let rect = app.response_body_rect;
+    if x < rect.x || y < rect.y { return None; }
+    let line = (y - rect.y) as usize + app.response_scroll as usize;
+    let col = (x - rect.x) as usize + app.response_scroll_x as usize;
+    Some((line, col))
 }
 
 fn rect_contains(rect: ratatui::layout::Rect, x: u16, y: u16) -> bool {

@@ -148,6 +148,13 @@ pub struct App {
     pub response_scroll_x: u16,
     pub is_loading: bool,
 
+    // --- Response body text selection (content coordinates: line, col) ---
+    pub response_sel_start: Option<(usize, usize)>,
+    pub response_sel_end: Option<(usize, usize)>,
+    pub response_is_selecting: bool,
+    /// Rect of the body text area, stored each frame for mouse hit-testing
+    pub response_body_rect: ratatui::layout::Rect,
+
     // --- Status message ---
     pub status_message: String,
 
@@ -257,6 +264,10 @@ impl App {
             response_scroll: 0,
             response_scroll_x: 0,
             is_loading: false,
+            response_sel_start: None,
+            response_sel_end: None,
+            response_is_selecting: false,
+            response_body_rect: ratatui::layout::Rect::default(),
             status_message: String::new(),
             show_help: false,
             create_mode: CreateMode::None,
@@ -742,6 +753,67 @@ impl App {
     }
 
     /// Return a copy of `current_request` with all `{{VAR}}` substituted.
+    // -------------------------------------------------------------------------
+    // Response text selection
+    // -------------------------------------------------------------------------
+
+    /// Return (normalized_start, normalized_end) in content (line, col) order,
+    /// or None if there is no active selection.
+    pub fn normalized_response_selection(&self) -> Option<((usize, usize), (usize, usize))> {
+        let start = self.response_sel_start?;
+        let end = self.response_sel_end?;
+        if start <= end { Some((start, end)) } else { Some((end, start)) }
+    }
+
+    /// Extract the currently selected text from the response body. Returns None
+    /// if there is no selection or no response.
+    pub fn selected_response_text(&self) -> Option<String> {
+        let (start, end) = self.normalized_response_selection()?;
+        let body = self.response.as_ref()?.pretty_body();
+        let lines: Vec<&str> = body.lines().collect();
+
+        if start.0 == end.0 {
+            let line = lines.get(start.0)?;
+            let chars: Vec<char> = line.chars().collect();
+            let s = start.1.min(chars.len());
+            let e = (end.1 + 1).min(chars.len());
+            if s >= e { return None; }
+            Some(chars[s..e].iter().collect())
+        } else {
+            let mut result = String::new();
+            for line_idx in start.0..=end.0 {
+                let line = lines.get(line_idx).copied().unwrap_or("");
+                let chars: Vec<char> = line.chars().collect();
+                if line_idx == start.0 {
+                    let s = start.1.min(chars.len());
+                    result.push_str(&chars[s..].iter().collect::<String>());
+                    result.push('\n');
+                } else if line_idx == end.0 {
+                    let e = (end.1 + 1).min(chars.len());
+                    result.push_str(&chars[..e].iter().collect::<String>());
+                } else {
+                    result.push_str(line);
+                    result.push('\n');
+                }
+            }
+            Some(result)
+        }
+    }
+
+    /// Copy the selected response text to the system clipboard. Returns a status
+    /// message describing success or failure.
+    pub fn copy_response_selection(&mut self) -> String {
+        match self.selected_response_text() {
+            None => "No text selected".to_string(),
+            Some(text) => {
+                match arboard::Clipboard::new().and_then(|mut cb| cb.set_text(text.clone())) {
+                    Ok(()) => format!("Copied {} chars", text.len()),
+                    Err(e) => format!("Clipboard error: {e}"),
+                }
+            }
+        }
+    }
+
     pub fn resolved_request(&self) -> Request {
         let env = &self.env;
         Request {
