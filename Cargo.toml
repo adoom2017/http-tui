@@ -1,0 +1,20 @@
+[package]
+name = "http-tui"
+version = "0.1.0"
+edition = "2021"
+description = "A terminal-based HTTP debugging tool similar to Postman"
+
+[[bin]]
+name = "http-tui"
+path = "src/main.rs"
+
+[dependencies]
+ratatui = "0.29"
+crossterm = "0.28"
+tokio = { version = "1", features = ["full"] }
+reqwest = { version = "0.12", features = ["json", "rustls-tls"], default-features = false }
+serde = { version = "1", features = ["derive"] }
+serde_yaml = "0.9"
+serde_json = { version = "1", features = ["preserve_order"] }
+anyhow = "1"
+walkdir = "2"
