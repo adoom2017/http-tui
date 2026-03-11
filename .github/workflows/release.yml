@@ -4,14 +4,37 @@ on:
   push:
     tags:
       - 'v[0-9]*'
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Version tag (e.g. v1.0.0)'
+        required: true
 
 permissions:
   contents: write
 
 jobs:
+  # Resolve the version once and share it with downstream jobs
+  prepare:
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.version.outputs.value }}
+    steps:
+      - name: Resolve version
+        id: version
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            echo "value=${{ github.event.inputs.tag }}" >> "$GITHUB_OUTPUT"
+          else
+            echo "value=${{ github.ref_name }}" >> "$GITHUB_OUTPUT"
+          fi
+
   build:
     name: Build — ${{ matrix.target }}
+    needs: prepare
     runs-on: ${{ matrix.os }}
+    env:
+      VERSION: ${{ needs.prepare.outputs.version }}
     strategy:
       fail-fast: false
       matrix:
@@ -75,7 +98,7 @@ jobs:
         shell: bash
         run: |
           BIN=target/${{ matrix.target }}/release/http-tui
-          ARCHIVE=http-tui-${{ github.ref_name }}-${{ matrix.target }}.tar.gz
+          ARCHIVE=http-tui-${{ env.VERSION }}-${{ matrix.target }}.tar.gz
           tar czf "$ARCHIVE" -C "$(dirname "$BIN")" "$(basename "$BIN")"
           echo "ASSET=$ARCHIVE" >> "$GITHUB_ENV"
 
@@ -84,7 +107,7 @@ jobs:
         shell: pwsh
         run: |
           $bin  = "target\${{ matrix.target }}\release\http-tui.exe"
-          $name = "http-tui-${{ github.ref_name }}-${{ matrix.target }}.zip"
+          $name = "http-tui-${{ env.VERSION }}-${{ matrix.target }}.zip"
           Compress-Archive -Path $bin -DestinationPath $name
           "ASSET=$name" | Out-File -FilePath $env:GITHUB_ENV -Append
 
@@ -96,7 +119,7 @@ jobs:
 
   release:
     name: Publish Release
-    needs: build
+    needs: [prepare, build]
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
@@ -111,6 +134,7 @@ jobs:
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
         with:
+          tag_name: ${{ needs.prepare.outputs.version }}
           files: artifacts/*
           generate_release_notes: true
           fail_on_unmatched_files: true
