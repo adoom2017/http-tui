@@ -248,8 +248,8 @@ impl App {
             current_request: Request::new("New Request"),
             current_collection_path: None,
             current_request_index: None,
-            request_tab: RequestTab::Headers,
-            editor_field: EditorField::Url,
+            request_tab: RequestTab::Body,
+            editor_field: EditorField::Body,
             header_rows: Vec::new(),
             header_selected: 0,
             header_edit_key: true,
@@ -639,7 +639,8 @@ impl App {
                 }
                 TreeItemKind::Request { collection_index, request_index } => {
                     self.load_request(collection_index, request_index);
-                    self.editor_field = EditorField::Url;
+                    self.request_tab = RequestTab::Body;
+                    self.editor_field = EditorField::Body;
                     // don't change focus — stay in collections panel
                 }
             }

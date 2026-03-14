@@ -64,6 +64,12 @@ pub fn handle_key(app: &mut App, key: KeyEvent) -> AppAction {
             app.status_message = "Sending request...".to_string();
             return AppAction::SendRequest;
         }
+        // Send request with 'r' — global, works from any panel when not editing
+        (KeyCode::Char('r'), KeyModifiers::NONE) if !app.editing && !app.show_env_editor && !app.show_dir_input => {
+            app.is_loading = true;
+            app.status_message = "Sending request...".to_string();
+            return AppAction::SendRequest;
+        }
         _ => {}
     }
 
@@ -140,8 +146,8 @@ fn handle_nav_tree(app: &mut App, key: KeyEvent) -> AppAction {
         (KeyCode::Enter, _) => {
             app.tree_select_item();
         }
-        // Create new collection file — inside the selected directory
-        (KeyCode::Char('n'), KeyModifiers::NONE) => {
+        // Create new collection file (c = new Collection) — inside the selected directory
+        (KeyCode::Char('c'), KeyModifiers::NONE) => {
             let parent_path = app.get_create_parent_path();
             app.create_mode = CreateMode::Collection {
                 input: String::new(),
@@ -149,8 +155,8 @@ fn handle_nav_tree(app: &mut App, key: KeyEvent) -> AppAction {
                 parent_path,
             };
         }
-        // Create new folder (Shift+N) — at the same level as the selected item
-        (KeyCode::Char('N'), _) => {
+        // Create new folder (f = new Folder) — at the same level as the selected item
+        (KeyCode::Char('f'), KeyModifiers::NONE) => {
             let parent_path = app.get_sibling_parent_path();
             app.create_mode = CreateMode::Folder {
                 input: String::new(),
@@ -158,16 +164,16 @@ fn handle_nav_tree(app: &mut App, key: KeyEvent) -> AppAction {
                 parent_path,
             };
         }
-        // Add new request to selected collection file
-        (KeyCode::Char('a'), KeyModifiers::NONE) => {
+        // Add new request to selected collection file (o = open/add, unified with headers & env)
+        (KeyCode::Char('o'), KeyModifiers::NONE) => {
             app.add_new_request_to_selected();
         }
-        // Delete selected item (request: immediate; file/folder: confirm first)
-        (KeyCode::Char('D'), _) => {
+        // Delete selected item — d unified with headers & env panels
+        (KeyCode::Char('d'), KeyModifiers::NONE) => {
             app.prompt_delete_selected();
         }
-        // Refresh collections from disk
-        (KeyCode::Char('R'), _) | (KeyCode::F(5), _) => {
+        // Refresh collections from disk — R only (F5 is now global send-request)
+        (KeyCode::Char('R'), _) => {
             app.reload_collections();
             app.status_message = "Refreshed".to_string();
         }
@@ -188,12 +194,7 @@ fn handle_nav_editor(app: &mut App, key: KeyEvent) -> AppAction {
             app.focus = FocusPanel::CollectionTree;
         }
 
-        // Send request
-        (KeyCode::Char('r'), KeyModifiers::NONE) => {
-            app.is_loading = true;
-            app.status_message = "Sending request...".to_string();
-            return AppAction::SendRequest;
-        }
+        // Note: 'r' (send request) is now handled globally in handle_key
 
         // Method cycling
         (KeyCode::Char('m'), KeyModifiers::NONE) => {
@@ -361,13 +362,13 @@ fn handle_nav_response(app: &mut App, key: KeyEvent) -> AppAction {
             app.response_scroll_x = 0;
         }
 
-        // Copy selection to clipboard
-        (KeyCode::Char('y'), KeyModifiers::NONE) | (KeyCode::Char('c'), KeyModifiers::CONTROL) => {
+        // y — yank/copy selection to clipboard (Ctrl+C is global quit, not used here)
+        (KeyCode::Char('y'), KeyModifiers::NONE) => {
             let msg = app.copy_response_selection();
             app.status_message = msg;
         }
 
-        // Clear selection
+        // Esc — clear any active text selection
         (KeyCode::Esc, _) => {
             app.response_sel_start = None;
             app.response_sel_end = None;

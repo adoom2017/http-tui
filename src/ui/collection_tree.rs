@@ -40,7 +40,7 @@ pub fn render(f: &mut Frame, app: &mut App, area: Rect) {
     app.tree_items_y = tree_area.y;
 
     if app.tree_items.is_empty() {
-        let msg = Paragraph::new("No collections found.\nPress [n] to create a .yaml\nor [N] to create a folder.")
+        let msg = Paragraph::new("No collections found.\nPress [c] to create a .yaml\nor [f] to create a folder.")
             .style(Style::default().fg(Color::DarkGray));
         f.render_widget(msg, tree_area);
         return;
