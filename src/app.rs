@@ -539,13 +539,22 @@ impl App {
                 let new_req = Request::new("New Request");
                 col_file.collection.requests.push(new_req);
                 let req_idx = col_file.collection.requests.len() - 1;
+                // Capture the path before reload so we can re-locate the collection afterwards
+                let saved_path = col_file.path.clone();
                 match col_file.save() {
                     Ok(_) => {
-                        // Expand this collection so the new request is visible
-                        self.collection_expanded.insert(col_idx);
+                        // reload_collections() may reorder collections, so re-find by path
                         self.reload_collections();
+                        let new_col_idx = self
+                            .collections
+                            .iter()
+                            .position(|c| c.path == saved_path)
+                            .unwrap_or(col_idx);
+                        // Expand this collection so the new request is visible
+                        self.collection_expanded.insert(new_col_idx);
+                        self.rebuild_tree_items();
                         // Load the new request but stay in collections panel
-                        self.load_request(col_idx, req_idx);
+                        self.load_request(new_col_idx, req_idx);
                         self.name_cursor = self.current_request.name.len();
                         self.editor_field = EditorField::Name;
                         self.editing = true;

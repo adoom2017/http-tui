@@ -735,10 +735,21 @@ fn edit_name(app: &mut App, key: KeyEvent) {
             }
         }
         KeyCode::Left => {
-            if *cursor > 0 { *cursor -= 1; }
+            if *cursor > 0 {
+                // step back one char boundary
+                *cursor = name[..*cursor]
+                    .char_indices()
+                    .last()
+                    .map(|(i, _)| i)
+                    .unwrap_or(0);
+            }
         }
         KeyCode::Right => {
-            if *cursor < name.len() { *cursor += 1; }
+            if *cursor < name.len() {
+                if let Some((_, c)) = name[*cursor..].char_indices().next() {
+                    *cursor += c.len_utf8();
+                }
+            }
         }
         KeyCode::Home => *cursor = 0,
         KeyCode::End => *cursor = name.len(),
@@ -767,19 +778,44 @@ fn edit_url(app: &mut App, key: KeyEvent) {
             }
         }
         KeyCode::Left => {
-            if *cursor > 0 { *cursor -= 1; }
+            if *cursor > 0 {
+                *cursor = url[..*cursor]
+                    .char_indices()
+                    .last()
+                    .map(|(i, _)| i)
+                    .unwrap_or(0);
+            }
         }
         KeyCode::Right => {
-            if *cursor < url.len() { *cursor += 1; }
+            if *cursor < url.len() {
+                if let Some((_, c)) = url[*cursor..].char_indices().next() {
+                    *cursor += c.len_utf8();
+                }
+            }
         }
         KeyCode::Home => *cursor = 0,
         KeyCode::End => *cursor = url.len(),
         KeyCode::Char('w') if key.modifiers == KeyModifiers::CONTROL => {
-            while *cursor > 0 && url.chars().nth(*cursor - 1).map_or(false, |c| c == ' ') {
-                *cursor -= 1; url.remove(*cursor);
+            // Delete word backwards: skip trailing spaces, then skip non-space chars
+            while *cursor > 0 {
+                let prev = url[..*cursor]
+                    .char_indices()
+                    .last()
+                    .map(|(i, _)| i)
+                    .unwrap_or(0);
+                if url[prev..].chars().next().unwrap_or(' ') != ' ' { break; }
+                url.remove(prev);
+                *cursor = prev;
             }
-            while *cursor > 0 && url.chars().nth(*cursor - 1).map_or(false, |c| c != ' ') {
-                *cursor -= 1; url.remove(*cursor);
+            while *cursor > 0 {
+                let prev = url[..*cursor]
+                    .char_indices()
+                    .last()
+                    .map(|(i, _)| i)
+                    .unwrap_or(0);
+                if url[prev..].chars().next().unwrap_or(' ') == ' ' { break; }
+                url.remove(prev);
+                *cursor = prev;
             }
         }
         KeyCode::Char('u') if key.modifiers == KeyModifiers::CONTROL => {

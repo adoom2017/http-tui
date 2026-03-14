@@ -42,6 +42,14 @@ pub fn load_collections(root: impl AsRef<Path>) -> Vec<CollectionFile> {
         .filter_map(|entry| entry.ok())
         .filter(|entry| {
             let path = entry.path();
+            // Skip env.yaml — it is not a collection file
+            let file_name = path
+                .file_name()
+                .and_then(|n| n.to_str())
+                .unwrap_or("");
+            if file_name == "env.yaml" || file_name == "env.yml" {
+                return false;
+            }
             path.is_file()
                 && path
                     .extension()
